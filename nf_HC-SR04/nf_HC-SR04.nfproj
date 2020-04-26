@@ -18,6 +18,7 @@
   </PropertyGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.props" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.props')" />
   <ItemGroup>
+    <Compile Include="FrequencyGate.cs" />
     <Compile Include="HC_SR04.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -37,6 +38,9 @@
       <HintPath>..\packages\nanoFramework.Windows.Devices.Gpio.1.4.1-preview.15\lib\Windows.Devices.Gpio.dll</HintPath>
       <Private>True</Private>
       <SpecificVersion>True</SpecificVersion>
+    </Reference>
+    <Reference Include="Windows.Devices.Pwm">
+      <HintPath>..\packages\nanoFramework.Windows.Devices.Pwm.1.5.1-preview.10\lib\Windows.Devices.Pwm.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using Windows.Devices.Gpio;
-
+using Windows.Devices.Pwm;
 
 namespace Driver.HC_SR04
 {
@@ -20,9 +20,17 @@ namespace Driver.HC_SR04
     {
         private GpioPin portOut;
         private GpioPin interIn;
+        private GpioPin countPin;
+        GpioChangeCounter gpcc = null;
         private long beginTick;
         private long endTick;
         private long ticks;
+
+        // Set up the counter pin used
+        //const int COUNTER_INPUT_PIN = 22;
+        // private readonly int CounterInputPin;
+        public int CounterInputPin { get; private set; }
+  
 
         /// <summary>
         /// Returns the library version number
@@ -60,11 +68,11 @@ namespace Driver.HC_SR04
             }
             if (ticks == 0)            // Target too close. soft error
             {
-                throw new Exception("1");
+                // throw new Exception("1");
             }
             else if (ticks == -1)           //No echo received. hard error
             {
-                throw new Exception("2");
+                //  throw new Exception("2");
             }
 
             // Mudar error code 0 deve ser all good. Checar os Comsumers
@@ -83,28 +91,47 @@ namespace Driver.HC_SR04
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="pinTrig">Netduino pin connected to the HC-SR04 Trig pin</param>
-        /// <param name="pinEcho">Netduino pin connected to the HC-SR04 Echo pin</param>
+        /// <param name="pinTrig">Pin connected to the HC-SR04 Trig pin</param>
+        /// <param name="pinEcho">Pin connected to the HC-SR04 Echo pin</param>
         public HC_SR04(int pinTrig, int pinEcho)
         {
             var gpioController = GpioController.GetDefault();
 
             portOut = gpioController.OpenPin(pinTrig);
             portOut.SetDriveMode(GpioPinDriveMode.Output);
-            
+
             interIn = gpioController.OpenPin(pinEcho);
             interIn.SetDriveMode(GpioPinDriveMode.InputPullUp);
-            
+
             interIn.ValueChanged += InterIn_OnInterrupt;
 
-            //portOut = new OutputPort(pinTrig, false);
-            //interIn = new InterruptPort(pinEcho, false, Port.ResistorMode.Disabled, Port.InterruptMode.InterruptEdgeLow);
-            //interIn.OnInterrupt += new NativeEventHandler(interIn_OnInterrupt);
-            LatencyTicks = 0;//5287L; // Was 6200L -> Aprox. 92.57mm (5287L latency) + 16mm (913L) offset from sensor grill;
+            LatencyTicks = 5287L; // Was 6200L -> Aprox. 92.57mm (5287L latency) + 16mm (913L) offset from sensor grill;
             ConversionFactor = 57.1056; // for Cm  (was 58.3) //1440.0;  for inches.
-            Version = 1.5;
+
+            // Initialise count pin by opening GPIO as input
+            countPin = gpioController.OpenPin(CounterInputPin);
+            countPin.SetDriveMode(GpioPinDriveMode.InputPullUp);
+
+            // Create a Counter passing in the GPIO pin
+            gpcc = new GpioChangeCounter(countPin)
+            {
+                // Counter on raising edges
+                Polarity = GpioChangePolarity.Rising
+            };
+            gpcc.Start();
+
+            Version = 1.6;
         }
 
+        void InitGate()
+        {
+
+        }
+        //  RefOsc = new Reference(); // (23, 22);
+        
+        //FrequencyGate.Reference();
+        //  RefOsc.PWMFrequency = 10000;
+        //RefOsc.RefFrequencyStart();
         /// <summary>
         /// Trigger a sensor reading
         /// Convert ticks to distance using TicksToDistance below
@@ -114,13 +141,18 @@ namespace Driver.HC_SR04
         {
             // Reset Sensor
             endTick = 0L;
+
             portOut.Write(GpioPinValue.High);
-           // Thread.Sleep(1);
+            // Thread.Sleep(1);
 
             // Start Clock
-           // beginTick = System.DateTime.UtcNow.Ticks;
+            GpioChangeCount reset = gpcc.Reset();
+
+            beginTick = (long)reset.Count;
+
             // Trigger Sonic Pulse
             portOut.Write(GpioPinValue.Low);
+
 
             // Wait 1/20 second (this could be set as a variable instead of constant)
             Thread.Sleep(50);
@@ -154,16 +186,18 @@ namespace Driver.HC_SR04
         /// <param name="time">Transfer to endTick to calculated sound pulse travel time</param>
         void InterIn_OnInterrupt(object sender, GpioPinValueChangedEventArgs e)
         {
-            // Save the ticks when pulse was received back
-            if (e.Edge == GpioPinEdge.RisingEdge)
-            {
-                beginTick = DateTime.UtcNow.Ticks;
-                Console.WriteLine("BeginTick = " + beginTick.ToString());
-            }
-            else //(e.Edge == GpioPinEdge.FallingEdge)
-            {
-                endTick = DateTime.UtcNow.Ticks;
-                Console.WriteLine("EndTick = " + endTick.ToString());
+            // save the ticks when pulse was received back
+            //if (e.Edge == GpioPinEdge.RisingEdge)
+            //{
+            //    beginTick = 5;
+            //    Console.WriteLine("begintick = " + beginTick.ToString());
+            //}
+            //else
+            if (e.Edge == GpioPinEdge.FallingEdge)
+            { 
+
+            endTick = (long) gpcc.Read().RelativeTime.Ticks;
+                // Console.WriteLine("EndTick = " + endTick.ToString());
             }
         }
     }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using Driver.HC_SR04;
+using FrequencyGate;
 
 namespace nf_HC_SR04
 {
@@ -10,11 +11,16 @@ namespace nf_HC_SR04
         {
             Console.WriteLine("** nanoFramework Level Sensor with HC-SR04  on ESP32 DEV KITV1 Sample! **");
 
-            HC_SR04 Sensor = new HC_SR04(4, 2);
+            Reference Freq = new Reference(23, 100000);
+            Freq.RefFrequencyStart();
 
-            Sensor.EmptyDistance = 2000; // In milimeters
-
-            for (int i = 1; i < 100; i++)
+            HC_SR04 Sensor = new HC_SR04(4, 2)
+            {
+                EmptyDistance = 2000 // In milimeters
+            };
+           // Reference RefOsc = new Reference(23, 22);
+           
+            for (int i = 1; i < 200; i++)
             {
                 Sensor.GetNewValues();
 
