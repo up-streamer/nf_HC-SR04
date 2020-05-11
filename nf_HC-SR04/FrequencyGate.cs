@@ -1,4 +1,5 @@
 ﻿using Windows.Devices.Pwm;
+using System;
 
 namespace FrequencyGate
 {
@@ -25,13 +26,17 @@ namespace FrequencyGate
 
             pwmRefFreq = pwmc.OpenPin(PWMOutputPin);
             pwmRefFreq.SetActiveDutyCyclePercentage(0.5);
+
+            Console.WriteLine("PWM max freq = " + pwmc.MaxFrequency.ToString());
+            Console.WriteLine("PWM min freq = " + pwmc.MinFrequency.ToString());
+
         }
 
         public void RefFrequencyStart()
         {
             pwmRefFreq.Start();
         }
-
+        
         public void RefFrequencyStop()
         {
             pwmRefFreq.Stop();

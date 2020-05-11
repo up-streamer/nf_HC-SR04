@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading;
 using Windows.Devices.Gpio;
-using Windows.Devices.Pwm;
 
 namespace Driver.HC_SR04
 {
@@ -22,8 +21,9 @@ namespace Driver.HC_SR04
         private GpioPin interIn;
         private GpioPin countPin;
         GpioChangeCounter gpcc = null;
-        private long beginTick;
-        private long endTick;
+        GpioChangeCount etick;
+        private ulong beginTick;
+        private ulong endTick;
         private long ticks;
 
         // Set up the counter pin used
@@ -93,33 +93,34 @@ namespace Driver.HC_SR04
         /// </summary>
         /// <param name="pinTrig">Pin connected to the HC-SR04 Trig pin</param>
         /// <param name="pinEcho">Pin connected to the HC-SR04 Echo pin</param>
-        public HC_SR04(int pinTrig, int pinEcho)
+        public HC_SR04(int pinTrig, int pinEcho, int CounterInputPin)
         {
             var gpioController = GpioController.GetDefault();
-
-            portOut = gpioController.OpenPin(pinTrig);
-            portOut.SetDriveMode(GpioPinDriveMode.Output);
-
-            interIn = gpioController.OpenPin(pinEcho);
-            interIn.SetDriveMode(GpioPinDriveMode.InputPullUp);
-
-            interIn.ValueChanged += InterIn_OnInterrupt;
-
-            LatencyTicks = 5287L; // Was 6200L -> Aprox. 92.57mm (5287L latency) + 16mm (913L) offset from sensor grill;
-            ConversionFactor = 57.1056; // for Cm  (was 58.3) //1440.0;  for inches.
 
             // Initialise count pin by opening GPIO as input
             countPin = gpioController.OpenPin(CounterInputPin);
             countPin.SetDriveMode(GpioPinDriveMode.InputPullUp);
 
             // Create a Counter passing in the GPIO pin
-            gpcc = new GpioChangeCounter(countPin)
-            {
-                // Counter on raising edges
-                Polarity = GpioChangePolarity.Rising
-            };
+            gpcc = new GpioChangeCounter(countPin);
+            gpcc.Polarity = GpioChangePolarity.Rising;
+            //{
+            //    // Counter on raising edges
+            //    Polarity = GpioChangePolarity.Rising
+            //};
             gpcc.Start();
+            //** Initialize HC-SR04 Related pins **
+            portOut = gpioController.OpenPin(pinTrig);
+            portOut.SetDriveMode(GpioPinDriveMode.Output);
 
+            interIn = gpioController.OpenPin(pinEcho);
+            interIn.SetDriveMode(GpioPinDriveMode.InputPullUp);
+            
+            interIn.ValueChanged += InterIn_OnInterrupt;
+            
+            LatencyTicks = 0L; // Was 6200L -> Aprox. 92.57mm (5287L latency) + 16mm (913L) offset from sensor grill;
+            ConversionFactor = 1;//57.1056; // for Cm  (was 58.3) //1440.0;  for inches.
+          
             Version = 1.6;
         }
 
@@ -141,26 +142,30 @@ namespace Driver.HC_SR04
         {
             // Reset Sensor
             endTick = 0L;
+            GpioChangeCount btick = gpcc.Reset();
+            Console.WriteLine("BeginTick After reset = " + beginTick.ToString());
+            btick = gpcc.Read();
+            Console.WriteLine("BeginTick = " + beginTick.ToString());
+
+            beginTick = btick.Count;
 
             portOut.Write(GpioPinValue.High);
             // Thread.Sleep(1);
-
-            // Start Clock
-            GpioChangeCount reset = gpcc.Reset();
-
-            beginTick = (long)reset.Count;
-
             // Trigger Sonic Pulse
             portOut.Write(GpioPinValue.Low);
+
+            // Start Clock
 
 
             // Wait 1/20 second (this could be set as a variable instead of constant)
             Thread.Sleep(50);
-
+           
+            endTick = etick.Count;
+            Console.WriteLine("EndTick = " + endTick.ToString());
             if (endTick > 0L)
             {
                 // Calculate Difference
-                long elapsed = endTick - beginTick;
+                long elapsed = (long) (endTick - beginTick);
 
                 // Subtract out fixed overhead (interrupt lag, etc.)
                 elapsed -= LatencyTicks;
@@ -186,19 +191,23 @@ namespace Driver.HC_SR04
         /// <param name="time">Transfer to endTick to calculated sound pulse travel time</param>
         void InterIn_OnInterrupt(object sender, GpioPinValueChangedEventArgs e)
         {
+            // if (gpcc.IsStarted) { gpcc.Stop(); }
+
             // save the ticks when pulse was received back
             //if (e.Edge == GpioPinEdge.RisingEdge)
             //{
-            //    beginTick = 5;
-            //    Console.WriteLine("begintick = " + beginTick.ToString());
-            //}
-            //else
-            if (e.Edge == GpioPinEdge.FallingEdge)
-            { 
+            //    beginTick = (long)gpcc.Read().Count; 
+            //   // Console.WriteLine("begintick = " + beginTick.ToString());
+            //};
 
-            endTick = (long) gpcc.Read().RelativeTime.Ticks;
-                // Console.WriteLine("EndTick = " + endTick.ToString());
-            }
+            if (e.Edge == GpioPinEdge.FallingEdge)
+            {
+                 etick = gpcc.Read();
+                //endTick = (long)gpcc.Read().Count;
+                //Console.WriteLine("EndTick = " + endTick.ToString());
+            };
+            //GpioChangeCount etick = gpcc.Reset();
+            // endTick = etick.Count;
         }
     }
 }
